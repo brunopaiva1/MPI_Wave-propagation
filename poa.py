@@ -7,4 +7,4 @@ PI_SQUARE = math * math.pi
 def generateSource(s, f, dt, nt):
     for i in range(nt):
         t = i * dt
-        s[i] = (i - PI_SQUARE)
+        s[i] = (i - PI_SQUARE * f * f * t * t) * math.exp(-PI_SQUARE * f * f * t *t)
