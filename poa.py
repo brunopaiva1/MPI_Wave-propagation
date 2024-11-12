@@ -1,8 +1,9 @@
 from mpi4py import MPI
 import numpy as np
 import math
+import time
 
-PI_SQUARE = math * math.pi
+PI_SQUARE = math.pi * math.pi
 
 # Função para gerar a fonte sísmica utilizando a wavelet de Ricker
 def generateSource(s, f, dt, nt):
@@ -34,11 +35,53 @@ def calcZ(previousWave, x, y, z, ny, nz, dz):
             (4.0/3.0) * previousWave[x * ny * nz + y * nz + (z + 1)] -
             (1.0/12.0) * previousWave[x * ny * nz + y * nz + (z + 2)]) / (dz * dz)
 
+def wavePropagation(s, c, dx, dy, dz, dt, nx, ny, nz, nt, xs, ys, zs):
+    previousWave = np.zeros(nx * ny * nz)
+    nextWave = np.zeros(nx * ny * nz)
+    u = np.zeros(nx * ny * nz)
+    for t in range(nt):
+        for x in range(2, nx - 2):
+            for y in range(2, ny - 2):
+                for z in range(2, nz - 2):
+                    dEx = calcX(previousWave, x, y, z, ny, nz, dx)
+                    dEy = calcY(previousWave, x, y, z, ny, nz, dy)
+                    dEz = calcZ(previousWave, x, y, z, ny, nz, dz)
+
+                    nextWave[x * ny * nz + y * nz + z] = c * c * dt * dt * (dEx + dEy + dEz) - \
+                         previousWave[x * ny * nz + y * nz + z] + 2 * u[x * ny * nz + y * nz + z]
+
+        # Atualizar a posição da fonte
+        nextWave[xs * ny * nz + ys * nz + zs] -= c * c * dt * dt * s[t]
+
+        # Troca de wavefields
+        temp = u
+        u = nextWave
+        nextWave = previousWave
+        previousWave = temp
+        
+        # if t % 50 == 0:
+        #     filename = f"samples/sample_t{t}.bin"
+        #     nextWave.astype(np.float32).tofile(filename)
 
 
 def main():
-    xs, ys, zs = 15, 15, 15
+    start_time = time.time()
+    xs, ys, zs = 5, 5, 5
     dx, dy, dz = 10, 10, 10
+    dt = 0.001
+    nx, ny, nz = 20, 20, 20
+    nt = 501
+    f = 10
+    c = 1500
+
+    s = np.zeros(nt, dtype=np.float32)
+    generateSource(s, f, dt, nt)
+    wavePropagation(s, c, dx, dy, dz, dt, nx, ny, nz, nt, xs, ys, zs)
+
+    end_time = time.time()
+    execution_time = (end_time - start_time)
+    print(f"O tempo de execução é: {execution_time:.2f} segundos")
+
 
 if __name__ == "__main__":
     main()
