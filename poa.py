@@ -35,10 +35,15 @@ def calcZ(previousWave, x, y, z, ny, nz, dz):
             (4.0/3.0) * previousWave[x * ny * nz + y * nz + (z + 1)] -
             (1.0/12.0) * previousWave[x * ny * nz + y * nz + (z + 2)]) / (dz * dz)
 
-def wavePropagation(s, c, dx, dy, dz, dt, nx, ny, nz, nt, xs, ys, zs):
+def wavePropagation(s, c, dx, dy, dz, dt, nx, ny, nz, nt, xs, ys, zs, rank, size):
+    local_nx = nx // size
+    start_x = rank * local_nx
+    end_x = start_x + local_nx if rank != size - 1 else nx
+
     previousWave = np.zeros(nx * ny * nz)
     nextWave = np.zeros(nx * ny * nz)
     u = np.zeros(nx * ny * nz)
+    
     for t in range(nt):
         for x in range(2, nx - 2):
             for y in range(2, ny - 2):
