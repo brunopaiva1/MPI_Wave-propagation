@@ -40,12 +40,12 @@ def wavePropagation(s, c, dx, dy, dz, dt, nx, ny, nz, nt, xs, ys, zs, rank, size
     start_x = rank * local_nx
     end_x = start_x + local_nx if rank != size - 1 else nx
 
-    previousWave = np.zeros(nx * ny * nz)
-    nextWave = np.zeros(nx * ny * nz)
-    u = np.zeros(nx * ny * nz)
-    
+    previousWave = np.zeros(local_nx * ny * nz)
+    nextWave = np.zeros(local_nx * ny * nz)
+    u = np.zeros(local_nx * ny * nz)
+
     for t in range(nt):
-        for x in range(2, nx - 2):
+        for x in range(2, local_nx - 2):
             for y in range(2, ny - 2):
                 for z in range(2, nz - 2):
                     dEx = calcX(previousWave, x, y, z, ny, nz, dx)
@@ -53,10 +53,18 @@ def wavePropagation(s, c, dx, dy, dz, dt, nx, ny, nz, nt, xs, ys, zs, rank, size
                     dEz = calcZ(previousWave, x, y, z, ny, nz, dz)
 
                     nextWave[x * ny * nz + y * nz + z] = c * c * dt * dt * (dEx + dEy + dEz) - \
-                         previousWave[x * ny * nz + y * nz + z] + 2 * u[x * ny * nz + y * nz + z]
+                        previousWave[x * ny * nz + y * nz + z] + 2 * u[x * ny * nz + y * nz + z]
 
         # Atualizar a posição da fonte
-        nextWave[xs * ny * nz + ys * nz + zs] -= c * c * dt * dt * s[t]
+        if start_x <= xs < end_x:
+            local_xs = xs < start_x
+            nextWave[local_xs * ny * nz + ys * nz + zs] -= c * c * dt * dt * s[t]
+
+        if rank > 0:
+            MPI.COMM_WORLD.Sendrecv(nextWave[2 * ny * nz : 4 * ny * nz], dest=rank - 1, recvbuf=nextWave[0:2 * ny * nz], source=rank - 1)
+        if rank < size - 1:
+            MPI.COMM_WORLD.Sendrecv(nextWave[(local_nx - 4) * ny * nz : (local_nx - 2) * ny * nz], dest=rank + 1,
+                                    recvbuf=nextWave[(local_nx - 2) * ny * nz:], source=rank + 1)
 
         # Troca de wavefields
         temp = u
@@ -70,7 +78,12 @@ def wavePropagation(s, c, dx, dy, dz, dt, nx, ny, nz, nt, xs, ys, zs, rank, size
 
 
 def main():
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+
     start_time = time.time()
+
     xs, ys, zs = 5, 5, 5
     dx, dy, dz = 10, 10, 10
     dt = 0.001
@@ -80,12 +93,18 @@ def main():
     c = 1500
 
     s = np.zeros(nt, dtype=np.float32)
-    generateSource(s, f, dt, nt)
-    wavePropagation(s, c, dx, dy, dz, dt, nx, ny, nz, nt, xs, ys, zs)
+    if rank == 0:
+        generateSource(s, f, dt, nt)
+      
+    comm.Bcast(s, root=0)
+
+    wavePropagation(s, c, dx, dy, dz, dt, nx, ny, nz, nt, xs, ys, zs, rank, size)
 
     end_time = time.time()
     execution_time = (end_time - start_time)
-    print(f"O tempo de execução é: {execution_time:.2f} segundos")
+
+    if rank == 0:
+        print(f"O tempo de execução é: {execution_time:.2f} segundos")
 
 
 if __name__ == "__main__":
