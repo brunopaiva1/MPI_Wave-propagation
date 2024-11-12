@@ -51,13 +51,12 @@ def wavePropagation(s, c, dx, dy, dz, dt, nx, ny, nz, nt, xs, ys, zs, rank, size
                     dEx = calcX(previousWave, x, y, z, ny, nz, dx)
                     dEy = calcY(previousWave, x, y, z, ny, nz, dy)
                     dEz = calcZ(previousWave, x, y, z, ny, nz, dz)
-
                     nextWave[x * ny * nz + y * nz + z] = c * c * dt * dt * (dEx + dEy + dEz) - \
                         previousWave[x * ny * nz + y * nz + z] + 2 * u[x * ny * nz + y * nz + z]
 
         # Atualizar a posição da fonte
         if start_x <= xs < end_x:
-            local_xs = xs < start_x
+            local_xs = xs - start_x
             nextWave[local_xs * ny * nz + ys * nz + zs] -= c * c * dt * dt * s[t]
 
         if rank > 0:
@@ -101,7 +100,7 @@ def main():
     wavePropagation(s, c, dx, dy, dz, dt, nx, ny, nz, nt, xs, ys, zs, rank, size)
 
     end_time = time.time()
-    execution_time = (end_time - start_time)
+    execution_time = end_time - start_time
 
     if rank == 0:
         print(f"O tempo de execução é: {execution_time:.2f} segundos")
